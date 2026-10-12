@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Controle de Vendas</title>
+<style>
+:root{--bg:#f3f5f2;--card:#fff;--ink:#1d2a24;--mut:#64736b;--line:#dbe2dd;--pri:#1f6b4f;--priInk:#fff;--ok:#1f6b4f;--warn:#b7791f;--bad:#b4432f;--okbg:#e1f1e8;--warnbg:#faefd6;--badbg:#f7e0da;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#121815;--card:#1b241f;--ink:#e6ede9;--mut:#93a39a;--line:#2d3a33;--pri:#4fb98c;--priInk:#0c1712;--ok:#6fd1a5;--warn:#e3b04f;--bad:#e8806c;--okbg:#1d3a2c;--warnbg:#3a3017;--badbg:#3d2119}}
+:root[data-theme="dark"]{--bg:#121815;--card:#1b241f;--ink:#e6ede9;--mut:#93a39a;--line:#2d3a33;--pri:#4fb98c;--priInk:#0c1712;--ok:#6fd1a5;--warn:#e3b04f;--bad:#e8806c;--okbg:#1d3a2c;--warnbg:#3a3017;--badbg:#3d2119}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+main{max-width:1200px;margin:0 auto;padding:16px}
+h1{font-size:22px;margin:0 0 14px}
+h2{font-size:16px;margin:0 0 10px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px;margin-bottom:14px}
+.sum{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:14px}
+.sum div{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+.sum small{color:var(--mut);display:block}
+.sum b{font-size:19px}
+.sum .big{border-left:4px solid var(--pri)}
+form{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;align-items:end}
+label{display:flex;flex-direction:column;font-size:12px;color:var(--mut);gap:3px}
+input,select{font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:7px;padding:7px 8px;width:100%;min-width:0}
+input:focus,select:focus,button:focus-visible{outline:2px solid var(--pri);outline-offset:1px}
+button{font:inherit;cursor:pointer;border-radius:7px;border:1px solid var(--line);background:var(--card);color:var(--ink);padding:7px 11px}
+button.pri{background:var(--pri);color:var(--priInk);border-color:var(--pri);font-weight:600}
+button.del{color:var(--bad)}
+.bar{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px}
+.bar input{flex:1 1 200px}.bar select{flex:0 0 150px}
+.wrap{overflow-x:auto}
+table{border-collapse:collapse;width:100%;min-width:1050px}
+th,td{padding:8px 6px;border-bottom:1px solid var(--line);text-align:left;vertical-align:middle;white-space:nowrap}
+th{font-size:12px;color:var(--mut);font-weight:600}
+td.n,th.n{text-align:right}
+td input{padding:5px 6px}
+.st{padding:2px 8px;border-radius:99px;font-size:12px;font-weight:600}
+.Quitado{background:var(--okbg);color:var(--ok)}.Parcial{background:var(--warnbg);color:var(--warn)}.Pendente{background:var(--badbg);color:var(--bad)}
+.acts{display:flex;gap:4px}
+.det td{background:var(--bg);white-space:normal}
+.pg{display:flex;gap:8px;align-items:center;margin:4px 0;flex-wrap:wrap}.pg input{width:150px}
+.empty{color:var(--mut);padding:18px;text-align:center}
+</style>
+</head>
+<body>
+<main>
+<h1>Controle de Vendas</h1>
+
+<div class="sum" id="sum"></div>
+
+<section class="card">
+<h2 id="ftitle">Nova venda</h2>
+<form id="f">
+<label>Nome<input id="nome" required></label>
+<label>Produto<input id="produto" required></label>
+<label>Preço (R$)<input id="preco" type="number" step="0.01" min="0" required></label>
+<label>Qtde<input id="qtde" type="number" step="1" min="1" value="1" required></label>
+<label>Total<input id="total" readonly value="R$ 0,00"></label>
+<label id="l-data">Data pagamento<input id="data" type="date"></label>
+<label id="l-valor">Valor pago (R$)<input id="valor" type="number" step="0.01" min="0"></label>
+<div style="display:flex;gap:6px"><button class="pri" id="btn">Salvar venda</button><button type="button" id="cancel" hidden>Cancelar</button></div>
+</form>
+</section>
+
+<section class="card">
+<div class="bar">
+<input id="q" placeholder="Buscar por nome ou produto">
+<select id="fs"><option value="">Todos</option><option>Pendente</option><option>Parcial</option><option>Quitado</option></select>
+<button id="csv">Relatório CSV</button><button id="bk">Backup (CSV)</button><button id="rs">Restaurar backup</button><input type="file" id="rf" accept=".csv,text/csv" hidden>
+</div>
+<div class="wrap"><table>
+<thead><tr><th>Nome</th><th>Produto</th><th class="n">Preço</th><th class="n">Qtde</th><th class="n">Total</th><th>Data pagamento</th><th>Valor pago</th><th class="n">Total pago</th><th class="n">Saldo</th><th>Status</th><th>Ações</th></tr></thead>
+<tbody id="rows"></tbody>
+</table></div>
+</section>
+</main>
+<script>
+const KEY='controle_vendas_v1';
+const $=id=>document.getElementById(id);
+const brl=v=>(+v||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
+const fd=d=>d?d.split('-').reverse().join('/'):'—';
+const today=()=>new Date().toISOString().slice(0,10);
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+const tot=s=>s.preco*s.qtde, pago=s=>s.pagamentos.reduce((a,p)=>a+p.valor,0), saldo=s=>tot(s)-pago(s);
+const status=s=>saldo(s)<=0.005?'Quitado':pago(s)>0?'Parcial':'Pendente';
+
+let sales=[];try{sales=JSON.parse(localStorage.getItem(KEY))||[]}catch(e){}
+const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(sales))}catch(e){}};
+let editId=null,openId=null;
+
+function calcTotal(){$('total').value=brl((+$('preco').value||0)*(+$('qtde').value||0))}
+['preco','qtde'].forEach(i=>$(i).addEventListener('input',calcTotal));
+$('data').value=today();
+
+$('f').addEventListener('submit',e=>{
+  e.preventDefault();
+  const d={nome:$('nome').value.trim(),produto:$('produto').value.trim(),preco:+$('preco').value,qtde:+$('qtde').value};
+  if(editId){
+    Object.assign(sales.find(s=>s.id===editId),d);
+  }else{
+    const s={id:uid(),...d,pagamentos:[]};
+    const v=+$('valor').value;
+    if(v>0)s.pagamentos.push({id:uid(),data:$('data').value||today(),valor:Math.min(v,tot(s))});
+    sales.unshift(s);
+  }
+  save();resetForm();render();
+});
+function resetForm(){
+  editId=null;$('f').reset();$('qtde').value=1;$('data').value=today();calcTotal();
+  $('ftitle').textContent='Nova venda';$('btn').textContent='Salvar venda';
+  $('cancel').hidden=true;$('l-data').hidden=$('l-valor').hidden=false;
+}
+$('cancel').onclick=resetForm;
+$('q').oninput=$('fs').onchange=()=>render();
+
+function render(){
+  const q=$('q').value.toLowerCase(),fs=$('fs').value;
+  const list=sales.filter(s=>(!fs||status(s)===fs)&&(s.nome+' '+s.produto).toLowerCase().includes(q));
+  const T=sales.reduce((a,s)=>a+tot(s),0),P=sales.reduce((a,s)=>a+pago(s),0);
+  $('sum').innerHTML=`<div><small>Total vendido</small><b>${brl(T)}</b></div><div><small>Total recebido</small><b>${brl(P)}</b></div><div class="big"><small>A receber</small><b>${brl(T-P)}</b></div><div><small>Vendas quitadas</small><b>${sales.filter(s=>status(s)==='Quitado').length} de ${sales.length}</b></div>`;
+  if(!list.length){$('rows').innerHTML=`<tr><td colspan="11" class="empty">Nenhuma venda encontrada. Cadastre a primeira no formulário acima.</td></tr>`;return}
+  $('rows').innerHTML=list.map(s=>{
+    const st=status(s),ult=s.pagamentos.length?s.pagamentos[s.pagamentos.length-1].data:'';
+    let h=`<tr data-id="${s.id}"><td>${esc(s.nome)}</td><td>${esc(s.produto)}</td><td class="n">${brl(s.preco)}</td><td class="n">${s.qtde}</td><td class="n"><b>${brl(tot(s))}</b></td>
+    <td><input type="date" id="pd-${s.id}" value="${today()}" style="width:140px" title="Último: ${fd(ult)}"></td>
+    <td><div class="acts"><input type="number" step="0.01" min="0" id="pv-${s.id}" placeholder="0,00" style="width:100px"><button class="pri" data-act="pay" ${st==='Quitado'?'disabled':''}>Receber</button></div></td>
+    <td class="n">${brl(pago(s))}</td><td class="n"><b>${brl(Math.max(saldo(s),0))}</b></td><td><span class="st ${st}">${st}</span></td>
+    <td><div class="acts"><button data-act="pgs">Pagamentos (${s.pagamentos.length})</button><button data-act="edit">Editar</button><button class="del" data-act="del">Excluir</button></div></td></tr>`;
+    if(openId===s.id){
+      h+=`<tr class="det"><td colspan="11"><b>Histórico de pagamentos</b>`+(s.pagamentos.length?s.pagamentos.map(p=>`<div class="pg" data-pid="${p.id}"><input type="date" class="pe" data-f="data" value="${p.data}"><input type="number" step="0.01" min="0" class="pe" data-f="valor" value="${p.valor}"><button class="del" data-act="delp">Remover</button></div>`).join(''):'<div class="empty">Nenhum pagamento registrado.</div>')+`</td></tr>`;
+    }
+    return h;
+  }).join('');
+}
+
+$('rows').addEventListener('click',e=>{
+  const b=e.target.closest('button[data-act]');if(!b)return;
+  const tr=b.closest('tr'),pg=b.closest('.pg');
+  const id=tr.dataset.id||(tr.previousElementSibling&&tr.previousElementSibling.dataset.id);
+  const s=sales.find(x=>x.id===id);const act=b.dataset.act;
+  if(act==='pay'){
+    const v=+$('pv-'+id).value;
+    if(!(v>0)){$('pv-'+id).focus();return}
+    if(v>saldo(s)+0.005&&!confirm('O valor pago é maior que o saldo ('+brl(saldo(s))+'). Registrar mesmo assim?'))return;
+    s.pagamentos.push({id:uid(),data:$('pd-'+id).value||today(),valor:v});
+    save();render();
+  }else if(act==='pgs'){openId=openId===id?null:id;render()}
+  else if(act==='edit'){
+    editId=id;$('nome').value=s.nome;$('produto').value=s.produto;$('preco').value=s.preco;$('qtde').value=s.qtde;calcTotal();
+    $('ftitle').textContent='Editar venda';$('btn').textContent='Salvar alterações';$('cancel').hidden=false;
+    $('l-data').hidden=$('l-valor').hidden=true;scrollTo({top:0,behavior:'smooth'});$('nome').focus();
+  }else if(act==='del'){
+    if(confirm('Excluir a venda de '+s.nome+' e todos os pagamentos?')){sales=sales.filter(x=>x.id!==id);if(editId===id)resetForm();save();render()}
+  }else if(act==='delp'){
+    s.pagamentos=s.pagamentos.filter(p=>p.id!==pg.dataset.pid);save();render();
+  }
+});
+$('rows').addEventListener('change',e=>{
+  const i=e.target.closest('.pe');if(!i)return;
+  const pg=i.closest('.pg'),id=pg.closest('tr').previousElementSibling.dataset.id;
+  const p=sales.find(x=>x.id===id).pagamentos.find(x=>x.id===pg.dataset.pid);
+  if(i.dataset.f==='valor'){const v=+i.value;if(!(v>0)){i.value=p.valor;return}p.valor=v}else p.data=i.value||p.data;
+  save();render();
+});
+
+$('csv').onclick=()=>{
+  const r=[['Nome','Produto','Preço','Qtde','Total','Total pago','Saldo','Status']].concat(sales.map(s=>[s.nome,s.produto,s.preco,s.qtde,tot(s),pago(s),saldo(s),status(s)]));
+  const t=r.map(l=>l.map(c=>'"'+String(c).replace(/"/g,'""')+'"').join(';')).join('\n');
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['\ufeff'+t],{type:'text/csv'}));a.download='vendas.csv';a.click();
+};
+const dl=(name,txt)=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['\ufeff'+txt],{type:'text/csv'}));a.download=name;a.click()};
+$('bk').onclick=()=>{
+  const r=[['id','nome','produto','preco','qtde','data_pagamento','valor_pago']];
+  sales.forEach(s=>{
+    if(!s.pagamentos.length)r.push([s.id,s.nome,s.produto,s.preco,s.qtde,'','']);
+    else s.pagamentos.forEach(p=>r.push([s.id,s.nome,s.produto,s.preco,s.qtde,p.data,p.valor]));
+  });
+  dl('backup-vendas-'+today()+'.csv',r.map(l=>l.map(c=>'"'+String(c).replace(/"/g,'""')+'"').join(';')).join('\n'));
+};
+function parseCSV(t){
+  t=t.replace(/^\ufeff/,'');
+  const sep=(t.split('\n')[0].match(/;/g)||[]).length?';':',';
+  const rows=[];let row=[],f='',q=false;
+  for(let i=0;i<t.length;i++){
+    const c=t[i];
+    if(q){if(c==='"'){if(t[i+1]==='"'){f+='"';i++}else q=false}else f+=c}
+    else if(c==='"')q=true;
+    else if(c===sep){row.push(f);f=''}
+    else if(c==='\n'||c==='\r'){if(c==='\r'&&t[i+1]==='\n')i++;row.push(f);f='';rows.push(row);row=[]}
+    else f+=c;
+  }
+  if(f!==''||row.length){row.push(f);rows.push(row)}
+  return rows.filter(r=>r.some(x=>x!==''));
+}
+$('rs').onclick=()=>$('rf').click();
+$('rf').onchange=e=>{
+  const file=e.target.files[0];e.target.value='';if(!file)return;
+  const rd=new FileReader();
+  rd.onload=()=>{
+    try{
+      const rows=parseCSV(String(rd.result));
+      const h=(rows.shift()||[]).map(x=>x.trim().toLowerCase());
+      const ix=n=>h.indexOf(n);
+      ['nome','produto','preco','qtde'].forEach(n=>{if(ix(n)<0)throw new Error('coluna "'+n+'" não encontrada. Use um arquivo gerado por "Backup (CSV)".')});
+      const num=v=>+String(v).replace(',','.');
+      const dt=s=>/^\d{2}\/\d{2}\/\d{4}$/.test(s)?s.split('/').reverse().join('-'):s;
+      const map=new Map();
+      rows.forEach(r=>{
+        const g=n=>ix(n)<0?'':(r[ix(n)]||'').trim();
+        const d={nome:g('nome'),produto:g('produto'),preco:num(g('preco')),qtde:num(g('qtde'))};
+        if(!d.nome||!(d.preco>=0)||!(d.qtde>0))return;
+        const key=g('id')||[d.nome,d.produto,d.preco,d.qtde].join('|');
+        if(!map.has(key))map.set(key,{id:g('id')||uid(),...d,pagamentos:[]});
+        const v=num(g('valor_pago'));
+        if(v>0)map.get(key).pagamentos.push({id:uid(),data:dt(g('data_pagamento'))||today(),valor:v});
+      });
+      const novo=[...map.values()];
+      if(!novo.length)throw new Error('nenhuma venda válida no arquivo.');
+      if(!confirm('Restaurar '+novo.length+' venda(s)? Isso substitui todos os dados atuais deste navegador.'))return;
+      sales=novo;openId=null;save();resetForm();render();alert('Backup restaurado.');
+    }catch(err){alert('Não foi possível restaurar: '+err.message)}
+  };
+  rd.readAsText(file);
+};
+calcTotal();render();
+</script>
+</body>
+</html>
