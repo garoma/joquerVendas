@@ -11,6 +11,7 @@ box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:en
 :root[data-theme="dark"]{--bg:#121815;--card:#1b241f;--ink:#e6ede9;--mut:#93a39a;--line:#2d3a33;--pri:#4fb98c;--priInk:#0c1712;--ok:#6fd1a5;--warn:#e3b04f;--bad:#e8806c;--okbg:#1d3a2c;--warnbg:#3a3017;--badbg:#3d2119}
 html{scroll-padding-top:env(safe-area-inset-top,0px)}
 *{box-sizing:border-box}
+[hidden]{display:none!important}
 body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
 main{max-width:1200px;margin:0 auto;padding:16px}
 h1{font-size:22px;margin:0 0 14px}
@@ -47,6 +48,7 @@ td input{padding:5px 6px}
 <body>
 <main>
 <h1>Controle de Vendas</h1>
+<div id="warn" hidden style="background:var(--badbg);color:var(--bad);padding:8px 12px;border-radius:8px;margin-bottom:12px">Atenção: este navegador bloqueou o armazenamento local, então os dados não serão mantidos ao fechar a página. Use o Backup (CSV) para não perder nada.</div>
 
 <div class="sum" id="sum"></div>
 
@@ -88,7 +90,7 @@ const tot=s=>s.preco*s.qtde, pago=s=>s.pagamentos.reduce((a,p)=>a+p.valor,0), sa
 const status=s=>saldo(s)<=0.005?'Quitado':pago(s)>0?'Parcial':'Pendente';
 
 let sales=[];try{sales=JSON.parse(localStorage.getItem(KEY))||[]}catch(e){}
-const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(sales))}catch(e){}};
+const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(sales));$('warn').hidden=true}catch(e){$('warn').hidden=false}};
 let editId=null,openId=null,drafts={};
 
 function calcTotal(){$('total').value=brl((+$('preco').value||0)*(+$('qtde').value||0))}
@@ -99,9 +101,9 @@ $('f').addEventListener('submit',e=>{
   e.preventDefault();
   const d={nome:$('nome').value.trim(),produto:$('produto').value.trim(),preco:+$('preco').value,qtde:+$('qtde').value};
   if(editId){
-    Object.assign(sales.find(s=>s.id===editId),d);
+    const es=sales.find(s=>s.id===editId);Object.assign(es,d);if($('data').value)es.dataPag=$('data').value;
   }else{
-    const s={id:uid(),...d,pagamentos:[]};
+    const s={id:uid(),...d,dataPag:$('data').value||today(),pagamentos:[]};
     const v=+$('valor').value;
     if(v>0)s.pagamentos.push({id:uid(),data:$('data').value||today(),valor:Math.min(v,tot(s))});
     sales.unshift(s);
@@ -123,11 +125,11 @@ function render(){
   $('sum').innerHTML=`<div><small>Total vendido</small><b>${brl(T)}</b></div><div><small>Total recebido</small><b>${brl(P)}</b></div><div class="big"><small>A receber</small><b>${brl(T-P)}</b></div><div><small>Vendas quitadas</small><b>${sales.filter(s=>status(s)==='Quitado').length} de ${sales.length}</b></div>`;
   if(!list.length){$('rows').innerHTML=`<tr><td colspan="11" class="empty">Nenhuma venda encontrada. Cadastre a primeira no formulário acima.</td></tr>`;return}
   $('rows').innerHTML=list.map(s=>{
-    const st=status(s),ult=s.pagamentos.length?s.pagamentos[s.pagamentos.length-1].data:'';
+    const st=status(s),ult=s.pagamentos.map(p=>p.data).sort().pop()||'';
     let h=`<tr data-id="${s.id}"><td>${esc(s.nome)}</td><td>${esc(s.produto)}</td><td class="n">${brl(s.preco)}</td><td class="n">${s.qtde}</td><td class="n"><b>${brl(tot(s))}</b></td>
-    <td><input type="date" id="pd-${s.id}" value="${ult||drafts[s.id]||today()}" style="width:140px" title="${ult?'Data do último pagamento (editável)':'Data do próximo pagamento'}"></td>
+    <td><input type="date" id="pd-${s.id}" value="${s.dataPag||ult||today()}" style="width:140px" title="Data do pagamento (fica salva)"></td>
     <td><div class="acts"><input type="number" step="0.01" min="0" id="pv-${s.id}" placeholder="0,00" style="width:100px"><button class="pri" data-act="pay" ${st==='Quitado'?'disabled':''}>Receber</button></div></td>
-    <td class="n">${brl(pago(s))}</td><td class="n"><b>${brl(Math.max(saldo(s),0))}</b></td><td><span class="st ${st}">${st}</span></td>
+    <td class="n">${brl(pago(s))}${ult?`<br><small style="color:var(--mut)">último: ${fd(ult)}</small>`:''}</td><td class="n"><b>${brl(Math.max(saldo(s),0))}</b></td><td><span class="st ${st}">${st}</span></td>
     <td><div class="acts"><button data-act="pgs">Pagamentos (${s.pagamentos.length})</button><button data-act="edit">Editar</button><button class="del" data-act="del">Excluir</button></div></td></tr>`;
     if(openId===s.id){
       h+=`<tr class="det"><td colspan="11"><b>Histórico de pagamentos</b>`+(s.pagamentos.length?s.pagamentos.map(p=>`<div class="pg" data-pid="${p.id}"><input type="date" class="pe" data-f="data" value="${p.data}"><input type="number" step="0.01" min="0" class="pe" data-f="valor" value="${p.valor}"><button class="del" data-act="delp">Remover</button></div>`).join(''):'<div class="empty">Nenhum pagamento registrado.</div>')+`</td></tr>`;
@@ -145,13 +147,13 @@ $('rows').addEventListener('click',e=>{
     const v=+$('pv-'+id).value;
     if(!(v>0)){$('pv-'+id).focus();return}
     if(v>saldo(s)+0.005&&!confirm('O valor pago é maior que o saldo ('+brl(saldo(s))+'). Registrar mesmo assim?'))return;
-    s.pagamentos.push({id:uid(),data:s.pagamentos.length?today():($('pd-'+id).value||today()),valor:v});delete drafts[id];
+    const dt=$('pd-'+id).value||today();s.pagamentos.push({id:uid(),data:dt,valor:v});s.dataPag=dt;
     save();render();
   }else if(act==='pgs'){openId=openId===id?null:id;render()}
   else if(act==='edit'){
     editId=id;$('nome').value=s.nome;$('produto').value=s.produto;$('preco').value=s.preco;$('qtde').value=s.qtde;calcTotal();
     $('ftitle').textContent='Editar venda';$('btn').textContent='Salvar alterações';$('cancel').hidden=false;
-    $('l-data').hidden=$('l-valor').hidden=true;scrollTo({top:0,behavior:'smooth'});$('nome').focus();
+    $('l-data').hidden=false;$('l-valor').hidden=true;$('data').value=s.dataPag||s.pagamentos.map(p=>p.data).sort().pop()||today();scrollTo({top:0,behavior:'smooth'});$('nome').focus();
   }else if(act==='del'){
     if(confirm('Excluir a venda de '+s.nome+' e todos os pagamentos?')){sales=sales.filter(x=>x.id!==id);if(editId===id)resetForm();save();render()}
   }else if(act==='delp'){
@@ -161,15 +163,13 @@ $('rows').addEventListener('click',e=>{
 $('rows').addEventListener('change',e=>{
   if(e.target.id&&e.target.id.startsWith('pd-')){
     const id=e.target.id.slice(3),s=sales.find(x=>x.id===id);
-    if(!s||!e.target.value){render();return}
-    if(s.pagamentos.length){s.pagamentos[s.pagamentos.length-1].data=e.target.value;save()}
-    else drafts[id]=e.target.value;
-    render();return;
+    if(s&&e.target.value){s.dataPag=e.target.value;save()}
+    return;
   }
   const i=e.target.closest('.pe');if(!i)return;
   const pg=i.closest('.pg'),id=pg.closest('tr').previousElementSibling.dataset.id;
   const p=sales.find(x=>x.id===id).pagamentos.find(x=>x.id===pg.dataset.pid);
-  if(i.dataset.f==='valor'){const v=+i.value;if(!(v>0)){i.value=p.valor;return}p.valor=v}else p.data=i.value||p.data;
+  if(i.dataset.f==='valor'){const v=+i.value;if(!(v>0)){i.value=p.valor;return}p.valor=v}else{if(i.value){p.data=i.value;save()}return}
   save();render();
 });
 
@@ -180,10 +180,10 @@ $('csv').onclick=()=>{
 };
 const dl=(name,txt)=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['\ufeff'+txt],{type:'text/csv'}));a.download=name;a.click()};
 $('bk').onclick=()=>{
-  const r=[['id','nome','produto','preco','qtde','data_pagamento','valor_pago']];
+  const r=[['id','nome','produto','preco','qtde','data_pagamento','valor_pago','data_ref']];
   sales.forEach(s=>{
-    if(!s.pagamentos.length)r.push([s.id,s.nome,s.produto,s.preco,s.qtde,'','']);
-    else s.pagamentos.forEach(p=>r.push([s.id,s.nome,s.produto,s.preco,s.qtde,p.data,p.valor]));
+    if(!s.pagamentos.length)r.push([s.id,s.nome,s.produto,s.preco,s.qtde,'','',s.dataPag||'']);
+    else s.pagamentos.forEach(p=>r.push([s.id,s.nome,s.produto,s.preco,s.qtde,p.data,p.valor,s.dataPag||'']));
   });
   dl('backup-vendas-'+today()+'.csv',r.map(l=>l.map(c=>'"'+String(c).replace(/"/g,'""')+'"').join(';')).join('\n'));
 };
@@ -220,7 +220,7 @@ $('rf').onchange=e=>{
         const d={nome:g('nome'),produto:g('produto'),preco:num(g('preco')),qtde:num(g('qtde'))};
         if(!d.nome||!(d.preco>=0)||!(d.qtde>0))return;
         const key=g('id')||[d.nome,d.produto,d.preco,d.qtde].join('|');
-        if(!map.has(key))map.set(key,{id:g('id')||uid(),...d,pagamentos:[]});
+        if(!map.has(key))map.set(key,{id:g('id')||uid(),...d,dataPag:dt(g('data_ref'))||undefined,pagamentos:[]});
         const v=num(g('valor_pago'));
         if(v>0)map.get(key).pagamentos.push({id:uid(),data:dt(g('data_pagamento'))||today(),valor:v});
       });
@@ -232,6 +232,7 @@ $('rf').onchange=e=>{
   };
   rd.readAsText(file);
 };
+try{localStorage.setItem('_t','1');localStorage.removeItem('_t')}catch(e){$('warn').hidden=false}
 calcTotal();render();
 </script>
 </body>
